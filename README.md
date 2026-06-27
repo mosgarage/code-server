@@ -10,7 +10,7 @@
 ## Project Structure
 
 ```
-mosgarage/
+mosgaragedev/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
