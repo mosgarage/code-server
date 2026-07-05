@@ -1,141 +1,190 @@
-# ============================================================
-# mosgarage/mosgarage — Home Base Docker Image
-# Includes: code-server | Node.js 20 LTS | Express API | PM2
-#           GitHub auto-sync (git-setup + git-sync daemon)
-# ============================================================
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  mosgarage/code-server · Dockerfile                              ║
+# ║                                                                  ║
+# ║  Variants (--target):                                            ║
+# ║    base    Ubuntu 22.04 + code-server + Node 20 + .NET runtime   ║
+# ║    sdk     base + .NET 8 SDK (for local dev / CI)                ║
+# ║    python  base + Python 3.12 + uv                               ║
+# ║    full    base + SDK + Python (everything)                      ║
+# ║                                                                  ║
+# ║  :base + :latest  →  docker.io/mosgarage/code-server             ║
+# ║  :full            →  docker.io/mosgarage/workspace               ║
+# ║                                                                  ║
+# ║  WSL distro: make wsl-pack TARGET=full                           ║
+# ╚══════════════════════════════════════════════════════════════════╝
 
-FROM ubuntu:22.04
+ARG UBUNTU_VERSION=22.04
+ARG NODE_VERSION=20
+ARG DOTNET_CHANNEL=8.0
 
-LABEL maintainer="mosgarage"
-LABEL org.opencontainers.image.source="https://github.com/mosgarage/mosgaragedev"
-LABEL image="docker.io/mosgarage/mosgarage"
-LABEL description="mosgarage home base: code-server + node server + API + GitHub sync"
+# ── base ──────────────────────────────────────────────────────────────────────
+# Mirrors the workspace-base stage from mosgarage/mosgarage Dockerfile
+# so mosgarage/code-server:latest and mosgarage/workspace:latest stay in sync.
+FROM ubuntu:${UBUNTU_VERSION} AS base
 
-# ── Prevent interactive prompts ──────────────────────────────
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=UTC
+ARG NODE_VERSION
+ARG DOTNET_CHANNEL
 
-# ── Service ports ─────────────────────────────────────────────
-ENV CODE_SERVER_PORT=8080
-ENV NODE_SERVER_PORT=3000
-ENV API_PORT=4000
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    DOTNET_ROOT=/usr/local/dotnet \
+    PATH="$PATH:/usr/local/dotnet"
 
-# ── Auth ──────────────────────────────────────────────────────
-ENV CODE_SERVER_PASSWORD=mosgarage
-ENV API_KEY=
+LABEL org.opencontainers.image.title="mosgarage/code-server"
+LABEL org.opencontainers.image.description="mosgarage managed workspace — code-server + Node + .NET runtime"
+LABEL org.opencontainers.image.source="https://github.com/mosgarage/code-server"
+LABEL org.opencontainers.image.vendor="mosgarage"
 
-# ── GitHub sync ───────────────────────────────────────────────
-ENV GITHUB_USER=mosgaragedev
-ENV GITHUB_ORG=mosgarage
-ENV GITHUB_REPO=mosgaragedev
-ENV GITHUB_TOKEN=
-ENV GIT_BRANCH=main
-ENV GIT_NAME=mosgaragedev
-ENV GIT_EMAIL=mosgaragedev@users.noreply.github.com
-ENV GIT_SYNC_INTERVAL=900
-
-# ── Paths ─────────────────────────────────────────────────────
-ENV HOME_DIR=/home/mosgarage
-ENV APP_DIR=/app
-ENV NODE_ENV=production
-
-# ── Base system packages ─────────────────────────────────────
+# ── System packages (exact match to workspace-base) ───────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
+    openssh-client \
+    openssh-server \
     ca-certificates \
-    gnupg \
-    lsb-release \
     build-essential \
     python3 \
     python3-pip \
-    supervisor \
-    openssh-client \
-    inotify-tools \
     unzip \
     zip \
     jq \
-    htop \
-    nano \
     vim \
+    nano \
+    htop \
+    supervisor \
+    inotify-tools \
     net-tools \
-    iputils-ping \
-    dnsutils \
-    tzdata \
+    locales \
+    sudo \
+    && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Node.js 20 LTS ───────────────────────────────────────────
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+# ── Node.js 20 LTS ────────────────────────────────────────────────────────────
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest \
-    && npm install -g pm2 \
-    && npm install -g typescript \
-    && npm install -g ts-node \
+    && npm install -g npm@latest pm2 \
     && rm -rf /var/lib/apt/lists/*
 
-# ── code-server (VS Code in browser) ─────────────────────────
+# ── code-server ───────────────────────────────────────────────────────────────
 RUN curl -fsSL https://code-server.dev/install.sh | sh \
+    && rm -rf /tmp/code-server*
+
+# ── .NET aspnetcore runtime (mirrors workspace-base, no SDK overhead) ─────────
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh \
+    | bash -s -- --runtime aspnetcore --channel ${DOTNET_CHANNEL} \
+                 --install-dir /usr/local/dotnet \
+    && /usr/local/dotnet/dotnet --info
+
+# ── mosgarage user ────────────────────────────────────────────────────────────
+RUN useradd -m -s /bin/bash -d /home/mosgarage mosgarage \
+    && echo "mosgarage ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/mosgarage \
+    && chmod 0440 /etc/sudoers.d/mosgarage
+
+# ── Workspace directory structure ─────────────────────────────────────────────
+RUN mkdir -p \
+    /home/mosgarage/.config/code-server \
+    /home/mosgarage/.ssh \
+    /home/mosgarage/workspace \
+    /home/mosgarage/web \
+    /app/agent \
+    /var/log/mosgarage \
+    && chown -R mosgarage:mosgarage /home/mosgarage /var/log/mosgarage
+
+# ── SSH hardening ─────────────────────────────────────────────────────────────
+RUN mkdir -p /run/sshd && ssh-keygen -A \
+    && sed -i \
+        -e 's/#PasswordAuthentication yes/PasswordAuthentication no/' \
+        -e 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' \
+        /etc/ssh/sshd_config \
+    && echo "AllowUsers mosgarage" >> /etc/ssh/sshd_config \
+    && echo "Port 2222" >> /etc/ssh/sshd_config
+
+# ── Configs ───────────────────────────────────────────────────────────────────
+COPY config/workspace-supervisord.conf /etc/supervisor/conf.d/workspace.conf
+COPY config/code-server.yaml           /home/mosgarage/.config/code-server/config.yaml
+COPY config/wsl.conf                   /etc/wsl.conf
+
+# ── Scripts ───────────────────────────────────────────────────────────────────
+COPY scripts/workspace-startup.sh  /usr/local/bin/workspace-start
+COPY scripts/mgw                   /usr/local/bin/mgw
+RUN chmod +x /usr/local/bin/workspace-start /usr/local/bin/mgw
+
+# ── Web landing page ──────────────────────────────────────────────────────────
+COPY web/ /home/mosgarage/web/
+
+# ── Ownership ─────────────────────────────────────────────────────────────────
+RUN chown -R mosgarage:mosgarage \
+    /home/mosgarage/.config \
+    /home/mosgarage/web
+
+# ── Ports ─────────────────────────────────────────────────────────────────────
+# 8080 → code-server (VS Code browser IDE)
+# 3000 → user app dev port
+# 4000 → user app dev port
+# 7072 → workspace agent (mosgarage protocol)
+# 2222 → SSH
+EXPOSE 8080 3000 4000 7072 2222
+
+USER mosgarage
+WORKDIR /home/mosgarage/workspace
+CMD ["/usr/local/bin/workspace-start"]
+
+
+# ── sdk ───────────────────────────────────────────────────────────────────────
+# base + full .NET 8 SDK (replaces aspnetcore-only runtime)
+FROM base AS sdk
+
+USER root
+
+ARG DOTNET_CHANNEL=8.0
+
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh \
+    | bash -s -- --channel ${DOTNET_CHANNEL} \
+                 --install-dir /usr/local/dotnet \
+    && /usr/local/dotnet/dotnet --version
+
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_NOLOGO=1 \
+    NUGET_XMLDOC_MODE=skip
+
+USER mosgarage
+
+
+# ── python ────────────────────────────────────────────────────────────────────
+# base + Python 3.12 venv + uv
+FROM base AS python
+
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    && update-alternatives --install /usr/bin/python  python  /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && pip install --no-cache-dir uv \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Create user & directories ─────────────────────────────────
-RUN useradd -m -s /bin/bash mosgarage \
-    && mkdir -p ${APP_DIR}/server \
-    && mkdir -p ${APP_DIR}/api \
-    && mkdir -p ${APP_DIR}/workspace \
-    && mkdir -p ${HOME_DIR}/.config/code-server \
-    && mkdir -p ${HOME_DIR}/.ssh \
-    && mkdir -p /var/log/mosgarage
+USER mosgarage
 
-# ── Configs ───────────────────────────────────────────────────
-COPY config/code-server-config.yaml ${HOME_DIR}/.config/code-server/config.yaml
-COPY config/supervisord.conf        /etc/supervisor/conf.d/mosgarage.conf
 
-# ── Node server ───────────────────────────────────────────────
-COPY server/package.json  ${APP_DIR}/server/
-COPY server/index.js      ${APP_DIR}/server/
-COPY server/routes/       ${APP_DIR}/server/routes/
+# ── full ──────────────────────────────────────────────────────────────────────
+# .NET SDK + Python 3.12 + uv — the "grades" top-level distro
+FROM sdk AS full
 
-# ── API server ────────────────────────────────────────────────
-COPY api/package.json     ${APP_DIR}/api/
-COPY api/index.js         ${APP_DIR}/api/
-COPY api/routes/          ${APP_DIR}/api/routes/
-COPY api/middleware/      ${APP_DIR}/api/middleware/
+USER root
 
-# ── PM2 ecosystem ─────────────────────────────────────────────
-COPY config/ecosystem.config.js ${APP_DIR}/
+ARG DOTNET_CHANNEL=8.0
 
-# ── Install Node deps ─────────────────────────────────────────
-RUN cd ${APP_DIR}/server && npm install --omit=dev \
-    && cd ${APP_DIR}/api  && npm install --omit=dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    && update-alternatives --install /usr/bin/python  python  /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && pip install --no-cache-dir uv \
+    && rm -rf /var/lib/apt/lists/*
 
-# ── Scripts → /usr/local/bin ──────────────────────────────────
-COPY scripts/startup.sh        /usr/local/bin/startup
-COPY scripts/git-setup.sh      /usr/local/bin/git-setup
-COPY scripts/git-sync.sh       /usr/local/bin/git-sync
-COPY scripts/git-push-now.sh   /usr/local/bin/git-push-now
-COPY scripts/git-status.sh     /usr/local/bin/git-status
-
-RUN chmod +x \
-    /usr/local/bin/startup \
-    /usr/local/bin/git-setup \
-    /usr/local/bin/git-sync \
-    /usr/local/bin/git-push-now \
-    /usr/local/bin/git-status
-
-# ── Workspace welcome file ────────────────────────────────────
-COPY scripts/welcome.md ${APP_DIR}/workspace/WELCOME.md
-
-# ── Fix permissions ───────────────────────────────────────────
-RUN chown -R mosgarage:mosgarage ${APP_DIR} ${HOME_DIR} /var/log/mosgarage \
-    && chmod 700 ${HOME_DIR}/.ssh
-
-# ── Ports ─────────────────────────────────────────────────────
-#   8080 → code-server
-#   3000 → node-server (HTTP + WebSocket)
-#   4000 → api-server  (REST)
-EXPOSE 8080 3000 4000
-
-WORKDIR ${APP_DIR}
-
-CMD ["/usr/local/bin/startup"]
+USER mosgarage
