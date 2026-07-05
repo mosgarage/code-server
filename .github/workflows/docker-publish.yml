@@ -16,7 +16,7 @@ on:
 
 env:
   REGISTRY:       docker.io
-  IMAGE_NAME:     mosgarage/mosgarage
+  IMAGE_NAME:     mosgarage/code-server
   PLATFORMS:      linux/amd64,linux/arm64
 
 jobs:
@@ -101,10 +101,10 @@ jobs:
             type=sha,prefix=sha-,format=short
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
-            org.opencontainers.image.title=mosgarage
+            org.opencontainers.image.title=code-server
             org.opencontainers.image.description=mosgarage premium home base
-            org.opencontainers.image.url=https://hub.docker.com/r/mosgarage/mosgarage
-            org.opencontainers.image.source=https://github.com/mosgarage/mosgaragedev
+            org.opencontainers.image.url=https://hub.docker.com/r/mosgarage/code-server
+            org.opencontainers.image.source=https://github.com/mosgarage/code-server
             org.opencontainers.image.vendor=mosgarage
 
       - name: Build and push
@@ -130,7 +130,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | \`docker.io/mosgarage/mosgarage\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`docker.io/mosgarage/code-server\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Digest | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Tags | ${{ steps.meta.outputs.tags }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Platforms | ${{ env.PLATFORMS }} |" >> $GITHUB_STEP_SUMMARY
@@ -148,6 +148,6 @@ jobs:
         with:
           username:    ${{ secrets.DOCKERHUB_USERNAME }}
           password:    ${{ secrets.DOCKERHUB_TOKEN }}
-          repository:  mosgarage/mosgarage
+          repository:  mosgarage/code-server
           readme-filepath: ./README.md
         continue-on-error: true
