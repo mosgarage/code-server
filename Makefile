@@ -1,10 +1,10 @@
 # ============================================================
-# mosgarage · Makefile
+# code-server · Makefile
 # Usage: make <target>
 # ============================================================
 
-IMAGE     := docker.io/mosgarage/mosgarage
-CONTAINER := mosgarage
+IMAGE     := docker.io/mosgarage/code-server
+CONTAINER := code-server
 VERSION   ?= latest
 
 .PHONY: help build push run stop shell logs status git-sync git-status \
@@ -14,7 +14,7 @@ VERSION   ?= latest
 help:
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════╗"
-	@echo "║  mosgarage · Makefile targets                    ║"
+	@echo "║  code-server · Makefile targets                    ║"
 	@echo "╠══════════════════════════════════════════════════╣"
 	@echo "║  make setup          First-time setup            ║"
 	@echo "║  make build          Build Docker image          ║"
@@ -67,7 +67,7 @@ push:
 up:
 	@[[ -f .env ]] || { echo "❌ .env missing — run: make setup"; exit 1; }
 	docker compose up -d
-	@echo "✅ mosgarage is running"
+	@echo "✅ code-server is running"
 	@echo "   https://localhost  (Nginx — all services)"
 	@echo "   http://localhost:8080  (code-server direct)"
 
@@ -75,7 +75,7 @@ down:
 	docker compose down
 
 restart:
-	docker compose restart mosgarage
+	docker compose restart code-server
 
 deploy: push up
 	@echo "✅ Deploy complete"
@@ -88,13 +88,13 @@ logs:
 	docker compose logs -f $(CONTAINER)
 
 log-git:
-	docker exec $(CONTAINER) tail -f /var/log/mosgarage/git-sync.log
+	docker exec $(CONTAINER) tail -f /var/log/code-server/git-sync.log
 
 log-api:
-	docker exec $(CONTAINER) tail -f /var/log/mosgarage/api-server.log
+	docker exec $(CONTAINER) tail -f /var/log/code-server/api-server.log
 
 log-nginx:
-	docker exec $(CONTAINER) tail -f /var/log/mosgarage/nginx-access.log
+	docker exec $(CONTAINER) tail -f /var/log/code-server/nginx-access.log
 
 status:
 	@echo ""
@@ -125,9 +125,9 @@ setup-secrets:
 	@command -v gh >/dev/null || { echo "❌ Install GitHub CLI: https://cli.github.com"; exit 1; }
 	@[[ -n "$$DOCKERHUB_USERNAME" ]] || { echo "❌ Set DOCKERHUB_USERNAME env var"; exit 1; }
 	@[[ -n "$$DOCKERHUB_TOKEN"    ]] || { echo "❌ Set DOCKERHUB_TOKEN env var"; exit 1; }
-	gh secret set DOCKERHUB_USERNAME --body "$$DOCKERHUB_USERNAME" --repo mosgarage/mosgaragedev
-	gh secret set DOCKERHUB_TOKEN    --body "$$DOCKERHUB_TOKEN"    --repo mosgarage/mosgaragedev
-	@echo "✅ GitHub secrets set for mosgarage/mosgaragedev"
+	gh secret set DOCKERHUB_USERNAME --body "$$DOCKERHUB_USERNAME" --repo mosgarage/code-server
+	gh secret set DOCKERHUB_TOKEN    --body "$$DOCKERHUB_TOKEN"    --repo mosgarage/code-server
+	@echo "✅ GitHub secrets set for mosgarage/code-server"
 
 # ── Clean ─────────────────────────────────────────────────────
 clean:
