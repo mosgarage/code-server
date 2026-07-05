@@ -1,11 +1,11 @@
 # ============================================================
-# mosgarage/mosgarage — Docker Compose
-# GitHub: github.com/mosgarage/mosgaragedev
+# mosgarage/code-server — Docker Compose
+# GitHub: github.com/mosgarage/code-serverdev
 # ============================================================
 
 services:
   mosgarage:
-    image: docker.io/mosgarage/mosgarage:latest
+    image: docker.io/mosgarage/code-server:latest
     container_name: mosgarage
     build:
       context: .
@@ -55,7 +55,7 @@ services:
 
       # SSH deploy key (Option A auth — comment out if using GITHUB_TOKEN)
       # Generate with: ./scripts/gen-deploy-key.sh
-      # Add public key at: github.com/mosgarage/mosgaragedev/settings/keys
+      # Add public key at: github.com/mosgarage/code-server/settings/keys
       - ./ssh-keys/id_ed25519:/home/mosgarage/.ssh/id_ed25519:ro
       # - ./ssh-keys/id_ed25519.pub:/home/mosgarage/.ssh/id_ed25519.pub:ro
 
