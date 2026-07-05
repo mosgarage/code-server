@@ -1,5 +1,5 @@
 # ============================================================
-# mosgarage/mosgarage — Home Base Docker Image
+# mosgarage/code-server — Home Base Docker Image
 # Includes: code-server | Node.js 20 LTS | Express API | PM2
 #           GitHub auto-sync (git-setup + git-sync daemon)
 # ============================================================
@@ -7,8 +7,8 @@
 FROM ubuntu:22.04
 
 LABEL maintainer="mosgarage"
-LABEL org.opencontainers.image.source="https://github.com/mosgarage/mosgaragedev"
-LABEL image="docker.io/mosgarage/mosgarage"
+LABEL org.opencontainers.image.source="https://github.com/mosgarage/code-server"
+LABEL image="docker.io/mosgarage/code-server"
 LABEL description="mosgarage home base: code-server + node server + API + GitHub sync"
 
 # ── Prevent interactive prompts ──────────────────────────────
@@ -27,7 +27,7 @@ ENV API_KEY=
 # ── GitHub sync ───────────────────────────────────────────────
 ENV GITHUB_USER=mosgaragedev
 ENV GITHUB_ORG=mosgarage
-ENV GITHUB_REPO=mosgaragedev
+ENV GITHUB_REPO=code-server
 ENV GITHUB_TOKEN=
 ENV GIT_BRANCH=main
 ENV GIT_NAME=mosgaragedev
